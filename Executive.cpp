@@ -220,6 +220,8 @@ void Executive::run_setup_PvAi()
 	while (difficulty < 1 || difficulty > 3)
 	{
 		std::cout << "That is not a valid difficulty, try again (1 = easy, 2 = medium, 3 = hard): ";
+		std::cin.clear();
+		std::cin.ignore(123, '\n');		
 		std::cin >> difficulty;
 	}
 	computer.setDifficulty(difficulty);
@@ -294,6 +296,9 @@ void Executive::run_setup_PvAi()
 
 	//print last time so player can see 1x5 ship placed
 	display.friendlyBoard(player1.my_ships.m_board);
+
+	player1.SetNumShips(shipnum);
+	shipofplayer1.setShipNumber(numShipCoords(shipnum));
 
 	computer.SetNumShips(shipnum);
 	shipofai.setShipNumber(numShipCoords(shipnum));
@@ -590,11 +595,14 @@ void Executive::run_PvAi()
 	int round = 1;
 	bool player1torpedo = true;
 	//bool player2torpedo = true; TODO need to add is for the AI
+	bool computertorpedo = true;
+
 	string torpedodirection = "";
 	string playershot = "";
 
 	while (!shipofplayer1.isSunk() || !shipofai.isSunk())
 	{
+
 		if (round % 2 == 1)
 		{
 			cout << "Player 1's turn!\n";
@@ -613,7 +621,7 @@ void Executive::run_PvAi()
 			} else // The player doesn't have a torpedo available.
 				playershot == "shot";
 
-			if (playershot == "torp") // Shooting a torpedo
+			if (playershot == "torp" && player1torpedo) // Shooting a torpedo
 			{
 				string colorrow = "";
 
@@ -672,7 +680,7 @@ void Executive::run_PvAi()
 				}
 				player1torpedo = false;
 			}
-			else if(playershot == "shot") // Shooting a normal shot
+			else if(playershot == "shot" || !player1torpedo) // Shooting a normal shot
 			{
 				chooseFire1:
 				cout << "\nChoose the coordinate that you want to fire (row(1 - 9) col(A - I)): ";
@@ -739,7 +747,6 @@ void Executive::run_PvAi()
 					c_col = AIshot[1];
 
 					col = charToInt(c_col);
-					row--;
 
 					if (player1.Only_CheckHit(row, col) == true){
 						break;
@@ -747,7 +754,28 @@ void Executive::run_PvAi()
 				}
 
 
-			} else {	//AI is not set to Hard
+			} else {	//AI - not set to Hard
+
+
+				if (computertorpedo == true) {	// AI torp
+				
+					int comp_torp_shot = rand() % 9;
+					string direction = ((int)(rand() % 2) == 0) ? "f" : "b";
+
+					if (computer.getDifficulty() == 2)
+						direction += '2'; // Used for medium AI
+
+					bool iscol = (int)(rand() % 2);
+
+					firetorpedo(direction, comp_torp_shot, iscol, computer, player1, shipofplayer1);
+					if (shipofplayer1.isSunk()){
+						cout << "BattleshipAI Wins!\n";
+						break;
+					}
+					computertorpedo = false;
+					goto skip;
+				}
+
 
 				AIshot = computer.fireShot();
 
@@ -770,10 +798,12 @@ void Executive::run_PvAi()
 			}
 			else if(player1.my_ships.getValue(row, col) == 'X')
 			{
+				computer.UpdateEnemyBoard(row, col, false);
 				goto chooseFireAI;
 			}
 			else if(computer.enemy_ships.getValue(row, col) == 'O')
 			{
+				computer.UpdateEnemyBoard(row, col, false);
 				goto chooseFireAI;
 			}
 			else
@@ -783,6 +813,8 @@ void Executive::run_PvAi()
 				player1.my_ships.updateBoard(row, col, 'O');
 			}
 		}
+
+		skip:
 		round++;
 	}
 }
@@ -790,6 +822,11 @@ void Executive::run_PvAi()
 
 void Executive::firetorpedo(string direction, int firepostion, bool iscol, Player& friendly, Player& enemy, Ship& enemyShip)
 {
+	char temp = ' '; // Used for medium difficulty AI
+	if (direction.length() == 2)
+		temp = direction[1];
+
+	direction = direction[0];
 	if(direction == "f" || direction == "d")
 	{
 		if (iscol == true)// see if it's a row or col to fire from
@@ -801,10 +838,16 @@ void Executive::firetorpedo(string direction, int firepostion, bool iscol, Playe
 					display.hit();
 					enemyShip.setHit();
 					friendly.UpdateEnemyBoard(i, firepostion, true);
+					if (temp == '2') // Used in medium difficulty AI
+						computer.torpedoHit(i, firepostion);
 					return;//exits the method
 				}
 				else
 				{
+					if (enemy.my_ships.getValue(i, firepostion) == 'X') //if the torpedo comes across a previously hit ship, it stops
+					{
+						return;
+					}
 					friendly.UpdateEnemyBoard(i, firepostion, false);
 					enemy.my_ships.updateBoard(i, firepostion, 'O');
 				}
@@ -820,10 +863,17 @@ void Executive::firetorpedo(string direction, int firepostion, bool iscol, Playe
 					display.hit();
 					enemyShip.setHit();
 					friendly.UpdateEnemyBoard(firepostion, i, true);
+
+					if (temp == '2')
+						computer.torpedoHit(firepostion, i);
 					return;//exits the method
 				}
 				else
 				{
+					if (enemy.my_ships.getValue(firepostion, i) == 'X') //if the torpedo comes across a previously hit ship, it stops
+					{
+						return;
+					}					
 					friendly.UpdateEnemyBoard(firepostion, i, false);
 					enemy.my_ships.updateBoard(firepostion, i, 'O');
 				}
@@ -835,17 +885,23 @@ void Executive::firetorpedo(string direction, int firepostion, bool iscol, Playe
 	{
 		if (iscol == true)// see if it's a row or col to fire from
 		{
-			for (int i = 9; i >= 0; i--)
+			for (int i = 8; i >= 0; i--)
 			{
 				if (enemy.CheckHit(i, firepostion))
 				{
 					display.hit();
 					enemyShip.setHit();
 					friendly.UpdateEnemyBoard(i, firepostion, true);
+					if (temp == '2')
+						computer.torpedoHit(i, firepostion);
 					return;//exits the method
 				}
 				else
 				{
+					if (enemy.my_ships.getValue(i, firepostion) == 'X') //if the torpedo comes across a previously hit ship, it stops
+					{
+						return;
+					}					
 					friendly.UpdateEnemyBoard(i, firepostion, false);
 					enemy.my_ships.updateBoard(i, firepostion, 'O');
 				}
@@ -854,17 +910,23 @@ void Executive::firetorpedo(string direction, int firepostion, bool iscol, Playe
 		}
 		else
 		{
-			for (int i = 9; i >= 0; i--)
+			for (int i = 8; i >= 0; i--)
 			{
 				if (enemy.CheckHit(firepostion, i))
 				{
 					display.hit();
 					enemyShip.setHit();
 					friendly.UpdateEnemyBoard(firepostion, i, true);
+					if (temp == '2')
+						computer.torpedoHit(firepostion, i);
 					return;//exits the method
 				}
 				else
 				{
+					if (enemy.my_ships.getValue(firepostion, i) == 'X') //if the torpedo comes across a previously hit ship, it stops
+					{
+						return;
+					}					
 					friendly.UpdateEnemyBoard(firepostion, i, false);
 					enemy.my_ships.updateBoard(firepostion, i, 'O');
 				}

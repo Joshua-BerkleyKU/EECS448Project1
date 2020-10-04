@@ -14,14 +14,23 @@ using namespace std;
 class AI : public Player
 {
 	public:
+		/**
+		 * Default constructor for AI.
+		 * @post Initializes the AI for easy difficulty by default.
+		 */
+		AI();
 
-		AI();		//Shouldnt be used, needed for testing
 		/**
 		 * Constructor for AI.
 		 * @param difficulty - an int, 1 for easy, 2 for med, 3 for hard.
+		 * @post the AI has been initialized.
 		 */
 		AI(int difficulty);
 
+		/**
+		 * Destructor for AI.
+		 * @post all heap variables that have been initialized have been deleted.
+		 */
 		~AI();
 		
 		/**
@@ -41,7 +50,13 @@ class AI : public Player
 		 * Returns AI difficutly.
 		 * @post returns an int: 1, 2, or 3
 		 */
-		int getDifficulty();
+		int getDifficulty() const;
+
+		/**
+		 * Function is part of handling the case that the medium difficulty AI hits with a torpedo
+		 * @post the AI will start hit tracking on the torpedo hit.
+		 */
+		void torpedoHit(int row, int col);
 
 
 	private:
@@ -51,7 +66,7 @@ class AI : public Player
 		int* m_prevShot;
 		int* m_origHit;
 		bool m_trackingHit;
-		bool m_prevShotHit;
+		//bool m_prevShotHit;
 		int m_direction; // Direction from hit to search for more hits: 0 up, 1 left, 2 right, 3 down.
 
 		/**
